@@ -1,0 +1,14 @@
+# Java / Spring Boot
+backend/target/
+*.class
+
+# Node / Vite
+frontend/node_modules/
+frontend/dist/
+
+# Local environment and IDE files
+.env
+*.env.local
+.idea/
+.vscode/
+.DS_Store

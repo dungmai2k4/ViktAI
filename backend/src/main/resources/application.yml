@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: viktai-backend
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/viktai?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:password}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+  servlet:
+    multipart:
+      max-file-size: 15MB
+      max-request-size: 70MB
+
+server:
+  port: ${SERVER_PORT:8080}
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  hugging-face:
+    token: ${HF_TOKEN:}
+    model-url: ${HF_MODEL_URL:https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0}
+    mock-enabled: ${HF_MOCK_ENABLED:false}

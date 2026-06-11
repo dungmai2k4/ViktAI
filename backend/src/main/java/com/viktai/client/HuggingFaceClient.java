@@ -44,6 +44,12 @@ public class HuggingFaceClient {
                             + "Hãy cấu hình HF_TOKEN hoặc đặt HF_MOCK_ENABLED=true nếu muốn dùng ảnh demo."
             );
         }
+        if (!StringUtils.hasText(properties.token())) {
+            throw new AiProviderException(
+                    "Thiếu HF_TOKEN nên backend không thể gọi Hugging Face. "
+                            + "Hãy cấu hình HF_TOKEN hoặc đặt HF_MOCK_ENABLED=true nếu muốn dùng ảnh demo."
+            );
+        }
 
         try {
             byte[] imageBytes = restClient.post()

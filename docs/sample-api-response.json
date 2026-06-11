@@ -1,0 +1,23 @@
+{
+  "id": 1,
+  "style": "Đông Dương",
+  "designType": "FOUR_WALLS",
+  "description": "Phòng khách sang trọng, nhiều ánh sáng tự nhiên.",
+  "currentImageUrl": "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80",
+  "currentDescription": "Bản mô phỏng: đã xử lý 4 ảnh đầu vào và tạo thiết kế theo yêu cầu.",
+  "createdAt": "2026-06-11T10:15:30",
+  "messages": [
+    {
+      "id": 1,
+      "role": "USER",
+      "content": "Dựa trên các ảnh căn phòng được cung cấp...",
+      "createdAt": "2026-06-11T10:15:30"
+    },
+    {
+      "id": 2,
+      "role": "ASSISTANT",
+      "content": "Bản mô phỏng: đã xử lý 4 ảnh đầu vào và tạo thiết kế theo yêu cầu.",
+      "createdAt": "2026-06-11T10:15:31"
+    }
+  ]
+}

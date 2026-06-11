@@ -28,7 +28,7 @@ export default function Sidebar({ conversations, activeId, onNewChat, onSelect, 
           >
             <button className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => onSelect(conversation.id)}>
               <MessageSquare size={18} className="shrink-0" />
-              <span className="truncate text-sm font-medium">{conversation.style} · {conversation.designType}</span>
+              <span className="truncate text-sm font-medium">{conversation.style} · {readableDesignType(conversation.designType)}</span>
             </button>
             <button
               aria-label="Xóa cuộc hội thoại"
@@ -42,4 +42,10 @@ export default function Sidebar({ conversations, activeId, onNewChat, onSelect, 
       </div>
     </aside>
   );
+}
+
+function readableDesignType(designType) {
+  if (designType === 'FOUR_WALLS') return '4 mặt căn phòng';
+  if (designType === 'FLOOR_PLAN') return 'Sơ đồ';
+  return designType;
 }

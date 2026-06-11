@@ -32,7 +32,9 @@ public class ConversationServiceImpl implements ConversationService {
         validateCreateRequest(style, designType, files);
         // Prompt ban đầu gom loại ảnh, phong cách và mô tả để AI giữ đúng cấu trúc không gian.
         String prompt = buildInitialPrompt(style, designType, description);
-        AiDesignResult aiResult = huggingFaceClient.generateDesign(prompt, files);
+        String userMessage = buildInitialUserMessage(style, designType, description, files.size());
+        String responseDescription = buildInitialResponseDescription(style, designType, description, files.size());
+        AiDesignResult aiResult = huggingFaceClient.generateDesign(prompt, files, responseDescription);
 
         Conversation conversation = new Conversation();
         conversation.setStyle(style);
@@ -40,7 +42,7 @@ public class ConversationServiceImpl implements ConversationService {
         conversation.setDescription(description);
         conversation.setCurrentImageUrl(aiResult.imageUrl());
         conversation.setCurrentDescription(aiResult.description());
-        conversation.addMessage(newMessage("USER", prompt));
+        conversation.addMessage(newMessage("USER", userMessage));
         conversation.addMessage(newMessage("ASSISTANT", aiResult.description()));
 
         return toResponse(conversationRepository.save(conversation));
@@ -51,7 +53,8 @@ public class ConversationServiceImpl implements ConversationService {
         Conversation conversation = findConversation(id);
         // Prompt chỉnh sửa luôn nhắc AI giữ bố cục, kích thước và phong cách ban đầu.
         String prompt = buildEditPrompt(conversation, request.message());
-        AiDesignResult aiResult = huggingFaceClient.generateDesign(prompt, List.of());
+        String responseDescription = buildEditResponseDescription(conversation, request.message());
+        AiDesignResult aiResult = huggingFaceClient.generateDesign(prompt, List.of(), responseDescription);
 
         conversation.setCurrentImageUrl(aiResult.imageUrl());
         conversation.setCurrentDescription(aiResult.description());
@@ -97,6 +100,40 @@ public class ConversationServiceImpl implements ConversationService {
         if ("FLOOR_PLAN".equalsIgnoreCase(designType) && files.size() != 1) {
             throw new IllegalArgumentException("Loại sơ đồ mặt bằng cần đúng 1 ảnh");
         }
+    }
+
+    private String buildInitialUserMessage(String style, String designType, String description, int imageCount) {
+        return "Tạo thiết kế mới từ " + imageCount + " ảnh đầu vào.\n\n"
+                + "Loại đầu vào: " + readableDesignType(designType) + "\n"
+                + "Phong cách: " + style + "\n"
+                + "Mô tả: " + normalizeDescription(description);
+    }
+
+    private String buildInitialResponseDescription(String style, String designType, String description, int imageCount) {
+        return "Đã tạo bản render nội thất phong cách " + style
+                + " từ " + imageCount + " ảnh " + readableDesignType(designType) + ". "
+                + "Thiết kế ưu tiên giữ nguyên cấu trúc không gian, cân bằng ánh sáng, vật liệu và bố cục theo mô tả: "
+                + normalizeDescription(description) + ".";
+    }
+
+    private String buildEditResponseDescription(Conversation conversation, String message) {
+        return "Đã cập nhật thiết kế theo yêu cầu: “" + message + "”. "
+                + "Bố cục phòng, kích thước, không gian ban đầu và phong cách " + conversation.getStyle()
+                + " được giữ nhất quán với thiết kế trước đó.";
+    }
+
+    private String readableDesignType(String designType) {
+        if ("FOUR_WALLS".equalsIgnoreCase(designType)) {
+            return "4 mặt căn phòng";
+        }
+        if ("FLOOR_PLAN".equalsIgnoreCase(designType)) {
+            return "sơ đồ mặt bằng";
+        }
+        return designType;
+    }
+
+    private String normalizeDescription(String description) {
+        return StringUtils.hasText(description) ? description.trim() : "không có mô tả bổ sung";
     }
 
     private String buildInitialPrompt(String style, String designType, String description) {

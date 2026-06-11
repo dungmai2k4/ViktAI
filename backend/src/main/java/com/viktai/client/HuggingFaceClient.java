@@ -3,7 +3,6 @@ package com.viktai.client;
 import com.viktai.config.HuggingFaceProperties;
 import com.viktai.dto.AiDesignResult;
 import com.viktai.exception.AiProviderException;
-import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -26,10 +25,10 @@ public class HuggingFaceClient {
         this.restClient = builder.build();
     }
 
-    public AiDesignResult generateDesign(String prompt, List<MultipartFile> images) {
-        // Mock mode giúp frontend/backend chạy được ngay cả khi chưa cấu hình HF_TOKEN.
-        if (properties.mockEnabled() || !StringUtils.hasText(properties.token())) {
-            return new AiDesignResult(MOCK_IMAGE, buildVietnameseSummary(prompt, images.size(), true));
+    public AiDesignResult generateDesign(String prompt, List<MultipartFile> images, String responseDescription) {
+        // Mock mode chỉ dùng khi bật chủ động hoặc chưa cấu hình HF_TOKEN, tránh trả lời như nội dung dùng sẵn khi đã có token.
+        if (shouldUseMock()) {
+            return new AiDesignResult(MOCK_IMAGE, buildMockDescription(responseDescription));
         }
 
         try {
@@ -47,20 +46,18 @@ public class HuggingFaceClient {
             }
 
             String base64 = Base64.getEncoder().encodeToString(imageBytes);
-            return new AiDesignResult("data:image/png;base64," + base64, buildVietnameseSummary(prompt, images.size(), false));
+            return new AiDesignResult("data:image/png;base64," + base64, responseDescription);
         } catch (Exception ex) {
             throw new AiProviderException("Không thể gọi Hugging Face Inference API", ex);
         }
     }
 
-    private String buildVietnameseSummary(String prompt, int imageCount, boolean mock) {
-        String prefix = mock ? "Bản mô phỏng: " : "Bản render AI: ";
-        String compactPrompt = new String(prompt.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8)
-                .replaceAll("\\s+", " ")
-                .trim();
-        if (compactPrompt.length() > 180) {
-            compactPrompt = compactPrompt.substring(0, 180) + "...";
-        }
-        return prefix + "đã xử lý " + imageCount + " ảnh đầu vào và tạo thiết kế theo yêu cầu. " + compactPrompt;
+    private boolean shouldUseMock() {
+        return properties.mockEnabled() || !StringUtils.hasText(properties.token());
+    }
+
+    private String buildMockDescription(String responseDescription) {
+        return "[Chế độ demo] " + responseDescription
+                + " Để nhận ảnh AI thật từ Hugging Face, hãy cấu hình HF_TOKEN và đặt HF_MOCK_ENABLED=false.";
     }
 }

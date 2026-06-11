@@ -4,7 +4,7 @@ spring:
   datasource:
     url: ${DB_URL:jdbc:mysql://localhost:3306/viktai?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
     username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:123456}
+    password: ${DB_PASSWORD:password}
   jpa:
     hibernate:
       ddl-auto: update
@@ -26,4 +26,4 @@ app:
   hugging-face:
     token: ${HF_TOKEN:}
     model-url: ${HF_MODEL_URL:https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0}
-    mock-enabled: ${HF_MOCK_ENABLED:true}
+    mock-enabled: ${HF_MOCK_ENABLED:false}

@@ -10,7 +10,7 @@ export default function ChatWindow({ conversation, onSendMessage, loading }) {
   return (
     <div className="flex h-full flex-col bg-slate-100">
       <header className="border-b border-slate-200 bg-white px-6 py-4">
-        <p className="text-sm font-semibold uppercase tracking-wide text-emerald-600">{conversation.designType}</p>
+        <p className="text-sm font-semibold uppercase tracking-wide text-emerald-600">{readableDesignType(conversation.designType)}</p>
         <h1 className="text-2xl font-bold text-slate-950">Thiết kế phong cách {conversation.style}</h1>
         <p className="text-sm text-slate-500">{conversation.description || 'Không có mô tả ban đầu'}</p>
       </header>
@@ -26,4 +26,10 @@ export default function ChatWindow({ conversation, onSendMessage, loading }) {
       <ChatInput onSend={onSendMessage} disabled={loading} />
     </div>
   );
+}
+
+function readableDesignType(designType) {
+  if (designType === 'FOUR_WALLS') return '4 mặt căn phòng';
+  if (designType === 'FLOOR_PLAN') return '1 sơ đồ mặt bằng';
+  return designType;
 }

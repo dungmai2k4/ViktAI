@@ -13,6 +13,7 @@ CREATE TABLE message (
     conversation_id BIGINT NOT NULL,
     role VARCHAR(20) NOT NULL,
     content TEXT NOT NULL,
+    image_urls LONGTEXT,
     created_at DATETIME NOT NULL,
     CONSTRAINT fk_message_conversation
         FOREIGN KEY (conversation_id) REFERENCES conversation(id)

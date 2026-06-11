@@ -11,6 +11,9 @@ import com.viktai.exception.ResourceNotFoundException;
 import com.viktai.repository.ConversationRepository;
 import com.viktai.service.ConversationService;
 import jakarta.transaction.Transactional;
+import java.io.IOException;
+import java.util.Base64;
+import java.util.Arrays;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -31,10 +34,11 @@ public class ConversationServiceImpl implements ConversationService {
     public ConversationResponse createConversation(String style, String designType, String description, List<MultipartFile> files) {
         validateCreateRequest(style, designType, files);
         // Prompt ban đầu gom loại ảnh, phong cách và mô tả để AI giữ đúng cấu trúc không gian.
-        String prompt = buildInitialPrompt(style, designType, description);
-        String userMessage = buildInitialUserMessage(style, designType, description, files.size());
-        String responseDescription = buildInitialResponseDescription(style, designType, description, files.size());
-        AiDesignResult aiResult = huggingFaceClient.generateDesign(prompt, files, responseDescription);
+        List<String> uploadImageUrls = files.stream().map(this::toDataUrl).toList();
+        String prompt = buildInitialPrompt(style, designType, description, uploadImageUrls.size());
+        String userMessage = buildInitialUserMessage(style, designType, description, uploadImageUrls.size());
+        String responseDescription = buildInitialResponseDescription(style, designType, description, uploadImageUrls.size());
+        AiDesignResult aiResult = huggingFaceClient.generateDesign(prompt, uploadImageUrls, responseDescription);
 
         Conversation conversation = new Conversation();
         conversation.setStyle(style);
@@ -42,8 +46,8 @@ public class ConversationServiceImpl implements ConversationService {
         conversation.setDescription(description);
         conversation.setCurrentImageUrl(aiResult.imageUrl());
         conversation.setCurrentDescription(aiResult.description());
-        conversation.addMessage(newMessage("USER", userMessage));
-        conversation.addMessage(newMessage("ASSISTANT", aiResult.description()));
+        conversation.addMessage(newMessage("USER", userMessage, uploadImageUrls));
+        conversation.addMessage(newMessage("ASSISTANT", aiResult.description(), List.of(aiResult.imageUrl())));
 
         return toResponse(conversationRepository.save(conversation));
     }
@@ -52,14 +56,15 @@ public class ConversationServiceImpl implements ConversationService {
     public ConversationResponse addMessage(Long id, MessageRequest request) {
         Conversation conversation = findConversation(id);
         // Prompt chỉnh sửa luôn nhắc AI giữ bố cục, kích thước và phong cách ban đầu.
-        String prompt = buildEditPrompt(conversation, request.message());
+        List<String> sourceImageUrls = conversationSourceImageUrls(conversation);
+        String prompt = buildEditPrompt(conversation, request.message(), sourceImageUrls.size());
         String responseDescription = buildEditResponseDescription(conversation, request.message());
-        AiDesignResult aiResult = huggingFaceClient.generateDesign(prompt, List.of(), responseDescription);
+        AiDesignResult aiResult = huggingFaceClient.generateDesign(prompt, sourceImageUrls, responseDescription);
 
         conversation.setCurrentImageUrl(aiResult.imageUrl());
         conversation.setCurrentDescription(aiResult.description());
-        conversation.addMessage(newMessage("USER", request.message()));
-        conversation.addMessage(newMessage("ASSISTANT", aiResult.description()));
+        conversation.addMessage(newMessage("USER", request.message(), List.of()));
+        conversation.addMessage(newMessage("ASSISTANT", aiResult.description(), List.of(aiResult.imageUrl())));
 
         return toResponse(conversationRepository.save(conversation));
     }
@@ -136,21 +141,21 @@ public class ConversationServiceImpl implements ConversationService {
         return StringUtils.hasText(description) ? description.trim() : "không có mô tả bổ sung";
     }
 
-    private String buildInitialPrompt(String style, String designType, String description) {
-        return "Dựa trên các ảnh căn phòng được cung cấp.\n\n"
+    private String buildInitialPrompt(String style, String designType, String description, int imageCount) {
+        return "Dựa trên " + imageCount + " ảnh căn phòng được cung cấp trong request.\n\n"
                 + "Loại đầu vào: " + designType + "\n\n"
                 + "Phong cách:\n" + style + "\n\n"
                 + "Mô tả:\n" + (description == null ? "" : description) + "\n\n"
                 + "Yêu cầu:\n"
                 + "* Giữ nguyên cấu trúc không gian\n"
                 + "* Thiết kế theo phong cách " + style + "\n"
+                + "* Dùng các ảnh tham chiếu đã gửi kèm để giữ đúng hiện trạng phòng\n"
                 + "* Tạo ảnh render chân thực\n"
                 + "* Viết mô tả ngắn";
     }
 
-    private String buildEditPrompt(Conversation conversation, String message) {
-        return "Đây là thiết kế hiện tại.\n\n"
-                + "Ảnh hiện tại: " + conversation.getCurrentImageUrl() + "\n\n"
+    private String buildEditPrompt(Conversation conversation, String message, int imageCount) {
+        return "Đây là thiết kế hiện tại với " + imageCount + " ảnh tham chiếu gồm ảnh upload ban đầu và ảnh gần nhất trong đoạn chat.\n\n"
                 + "Giữ nguyên:\n"
                 + "* bố cục phòng\n"
                 + "* kích thước phòng\n"
@@ -161,11 +166,71 @@ public class ConversationServiceImpl implements ConversationService {
                 + "Tạo ảnh mới.";
     }
 
-    private Message newMessage(String role, String content) {
+    private String toDataUrl(MultipartFile file) {
+        try {
+            String contentType = StringUtils.hasText(file.getContentType()) ? file.getContentType() : "image/png";
+            String base64 = Base64.getEncoder().encodeToString(file.getBytes());
+            return "data:" + contentType + ";base64," + base64;
+        } catch (IOException ex) {
+            throw new IllegalArgumentException("Không thể đọc ảnh upload: " + file.getOriginalFilename(), ex);
+        }
+    }
+
+    private List<String> conversationSourceImageUrls(Conversation conversation) {
+        List<String> initialUploadImages = firstUserUploadImageUrls(conversation);
+        List<String> latestChatImages = latestChatImageUrls(conversation);
+
+        return java.util.stream.Stream.concat(initialUploadImages.stream(), latestChatImages.stream())
+                .filter(StringUtils::hasText)
+                .distinct()
+                .toList();
+    }
+
+    private List<String> firstUserUploadImageUrls(Conversation conversation) {
+        return conversation.getMessages().stream()
+                .filter(message -> "USER".equals(message.getRole()))
+                .map(message -> parseImageUrls(message.getImageUrls()))
+                .filter(imageUrls -> !imageUrls.isEmpty())
+                .findFirst()
+                .orElse(List.of());
+    }
+
+    private List<String> latestChatImageUrls(Conversation conversation) {
+        List<Message> messages = conversation.getMessages();
+        for (int index = messages.size() - 1; index >= 0; index--) {
+            List<String> imageUrls = parseImageUrls(messages.get(index).getImageUrls());
+            if (!imageUrls.isEmpty()) {
+                return imageUrls;
+            }
+        }
+        if (StringUtils.hasText(conversation.getCurrentImageUrl())) {
+            return List.of(conversation.getCurrentImageUrl());
+        }
+        return List.of();
+    }
+
+    private Message newMessage(String role, String content, List<String> imageUrls) {
         Message message = new Message();
         message.setRole(role);
         message.setContent(content);
+        message.setImageUrls(serializeImageUrls(imageUrls));
         return message;
+    }
+
+    private String serializeImageUrls(List<String> imageUrls) {
+        if (imageUrls == null || imageUrls.isEmpty()) {
+            return null;
+        }
+        return String.join("\n", imageUrls);
+    }
+
+    private List<String> parseImageUrls(String imageUrls) {
+        if (!StringUtils.hasText(imageUrls)) {
+            return List.of();
+        }
+        return Arrays.stream(imageUrls.split("\n"))
+                .filter(StringUtils::hasText)
+                .toList();
     }
 
     private ConversationResponse toResponse(Conversation conversation) {
@@ -182,6 +247,12 @@ public class ConversationServiceImpl implements ConversationService {
     }
 
     private MessageResponse toMessageResponse(Message message) {
-        return new MessageResponse(message.getId(), message.getRole(), message.getContent(), message.getCreatedAt());
+        return new MessageResponse(
+                message.getId(),
+                message.getRole(),
+                message.getContent(),
+                parseImageUrls(message.getImageUrls()),
+                message.getCreatedAt()
+        );
     }
 }

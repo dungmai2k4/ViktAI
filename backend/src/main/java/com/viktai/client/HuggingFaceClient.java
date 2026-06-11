@@ -26,9 +26,16 @@ public class HuggingFaceClient {
     }
 
     public AiDesignResult generateDesign(String prompt, List<MultipartFile> images, String responseDescription) {
-        // Mock mode chỉ dùng khi bật chủ động hoặc chưa cấu hình HF_TOKEN, tránh trả lời như nội dung dùng sẵn khi đã có token.
-        if (shouldUseMock()) {
+        // Chỉ trả ảnh demo khi bật HF_MOCK_ENABLED=true. Nếu thiếu token thì báo lỗi rõ ràng
+        // để tránh người dùng tưởng API thật nhưng vẫn nhận kết quả giống sample.
+        if (properties.mockEnabled()) {
             return new AiDesignResult(MOCK_IMAGE, buildMockDescription(responseDescription));
+        }
+        if (!StringUtils.hasText(properties.token())) {
+            throw new AiProviderException(
+                    "Thiếu HF_TOKEN nên backend không thể gọi Hugging Face. "
+                            + "Hãy cấu hình HF_TOKEN hoặc đặt HF_MOCK_ENABLED=true nếu muốn dùng ảnh demo."
+            );
         }
 
         try {
@@ -52,12 +59,9 @@ public class HuggingFaceClient {
         }
     }
 
-    private boolean shouldUseMock() {
-        return properties.mockEnabled() || !StringUtils.hasText(properties.token());
-    }
-
     private String buildMockDescription(String responseDescription) {
         return "[Chế độ demo] " + responseDescription
-                + " Để nhận ảnh AI thật từ Hugging Face, hãy cấu hình HF_TOKEN và đặt HF_MOCK_ENABLED=false.";
+                + " Backend đang dùng ảnh demo vì HF_MOCK_ENABLED=true. "
+                + "Để nhận ảnh AI thật từ Hugging Face, hãy cấu hình HF_TOKEN và đặt HF_MOCK_ENABLED=false.";
     }
 }

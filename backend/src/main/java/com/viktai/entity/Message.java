@@ -27,6 +27,9 @@ public class Message {
     @Column(columnDefinition = "TEXT", nullable = false)
     private String content;
 
+    @Column(name = "image_urls", columnDefinition = "LONGTEXT")
+    private String imageUrls;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -44,5 +47,7 @@ public class Message {
     public void setRole(String role) { this.role = role; }
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
+    public String getImageUrls() { return imageUrls; }
+    public void setImageUrls(String imageUrls) { this.imageUrls = imageUrls; }
     public LocalDateTime getCreatedAt() { return createdAt; }
 }
